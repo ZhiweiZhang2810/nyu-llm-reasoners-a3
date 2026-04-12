@@ -14,16 +14,55 @@ def load_prompt(name: str = "intellect") -> str:
     return path.read_text()
 
 
-def evaluate(llm, prompts, ground_truths):
+def evaluate(llm, prompts, ground_truths, log_examples=False):
     """Run evaluation and return accuracy."""
     params = SamplingParams(temperature=0.0, max_tokens=2048)
     outputs = llm.generate(prompts, params)
 
     correct = 0
+    cat1_count = 0  # Format 1, Answer 1
+    cat2_count = 0  # Format 1, Answer 0
+    cat3_count = 0  # Format 0, Answer 0
+    
+    cat2_examples = []
+    cat3_examples = []
+
     for i, output in enumerate(tqdm(outputs, desc="Grading")):
         text = output.outputs[0].text
         reward = question_only_reward_fn(text, ground_truths[i])
         correct += reward["reward"]
+        
+        f_rew = reward.get("format_reward", 0.0)
+        a_rew = reward.get("answer_reward", 0.0)
+        
+        if f_rew == 1.0 and a_rew == 1.0:
+            cat1_count += 1
+        elif f_rew == 1.0 and a_rew == 0.0:
+            cat2_count += 1
+            if log_examples and len(cat2_examples) < 10:
+                cat2_examples.append((prompts[i], text, ground_truths[i]))
+        elif f_rew == 0.0 and a_rew == 0.0:
+            cat3_count += 1
+            if log_examples and len(cat3_examples) < 10:
+                cat3_examples.append((prompts[i], text, ground_truths[i]))
+
+    if log_examples:
+        print("\n--- MATH Evaluation Statistics ---")
+        print(f"(1) Format Reward 1, Answer Reward 1: {cat1_count}")
+        print(f"(2) Format Reward 1, Answer Reward 0: {cat2_count}")
+        print(f"(3) Format Reward 0, Answer Reward 0: {cat3_count}")
+        
+        print("\n--- 10 Examples of Format 1, Answer 0 ---")
+        for idx, ex in enumerate(cat2_examples):
+            print(f"\n[Example {idx+1}]")
+            print(f"GT: {ex[2]}")
+            print(f"Output:\n{ex[1]}\n" + "-"*40)
+            
+        print("\n--- 10 Examples of Format 0, Answer 0 ---")
+        for idx, ex in enumerate(cat3_examples):
+            print(f"\n[Example {idx+1}]")
+            print(f"GT: {ex[2]}")
+            print(f"Output:\n{ex[1]}\n" + "-"*40)
 
     return correct / len(outputs)
 
@@ -74,7 +113,7 @@ def main():
     gts = [ex["answer"] for ex in math_ds]
 
     print(f"[Sample] {prompts[0][:200]}...")
-    acc = evaluate(llm, prompts, gts)
+    acc = evaluate(llm, prompts, gts, log_examples=True)
     print(f"MATH Accuracy: {acc:.4f}")
 
 
