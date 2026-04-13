@@ -6,7 +6,7 @@ from datasets import load_dataset, load_from_disk
 from tqdm import tqdm
 from vllm import LLM, SamplingParams
 
-from cs336_alignment.drgrpo_grader import question_only_reward_fn
+from student.drgrpo_grader import question_only_reward_fn
 
 
 def load_prompt(name: str = "intellect") -> str:
@@ -72,7 +72,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="Qwen/Qwen2.5-Math-1.5B")
     parser.add_argument("--max-examples", type=int, default=500)
-    parser.add_argument("--intellect-path", default="data/intellect_math_train_dev_test/test")
+    parser.add_argument("--intellect-path", default="data-distrib/intellect_math/test")
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.85)
     args = parser.parse_args()
 
@@ -86,22 +86,25 @@ def main():
     )
 
     # Evaluate on Intellect test
-    print(f"\n=== Intellect Test ({args.intellect_path}) ===")
-    dataset = load_from_disk(args.intellect_path)
-    if args.max_examples:
-        dataset = dataset.select(range(min(args.max_examples, len(dataset))))
+    if Path(args.intellect_path).exists():
+        print(f"\n=== Intellect Test ({args.intellect_path}) ===")
+        dataset = load_from_disk(args.intellect_path)
+        if args.max_examples:
+            dataset = dataset.select(range(min(args.max_examples, len(dataset))))
 
-    prompts, gts = [], []
-    for ex in dataset:
-        msgs = ex.get("messages", [])
-        sys_msg = next((m["content"] for m in msgs if m["role"] == "system"), "")
-        user_msg = next((m["content"] for m in msgs if m["role"] == "user"), "")
-        prompts.append(sys_msg + "\n\n" + user_msg if sys_msg else user_msg)
-        gts.append(ex.get("ground_truth", ""))
+        prompts, gts = [], []
+        for ex in dataset:
+            msgs = ex.get("messages", [])
+            sys_msg = next((m["content"] for m in msgs if m["role"] == "system"), "")
+            user_msg = next((m["content"] for m in msgs if m["role"] == "user"), "")
+            prompts.append(sys_msg + "\n\n" + user_msg if sys_msg else user_msg)
+            gts.append(ex.get("ground_truth", ""))
 
-    print(f"[Sample] {prompts[0][:200]}...")
-    acc = evaluate(llm, prompts, gts)
-    print(f"Intellect Accuracy: {acc:.4f}")
+        print(f"[Sample] {prompts[0][:200]}...")
+        acc = evaluate(llm, prompts, gts)
+        print(f"Intellect Accuracy: {acc:.4f}")
+    else:
+        print(f"\n[Warning] Intellect path '{args.intellect_path}' not found. Skipping.")
 
     # Evaluate on MATH
     print("\n=== MATH Test ===")
