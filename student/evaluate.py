@@ -6,7 +6,7 @@ from datasets import load_dataset, load_from_disk
 from tqdm import tqdm
 from vllm import LLM, SamplingParams
 
-from cs336_alignment.drgrpo_grader import question_only_reward_fn
+from student.drgrpo_grader import question_only_reward_fn
 
 
 def load_prompt(name: str = "intellect") -> str:
@@ -52,7 +52,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="Qwen/Qwen2.5-Math-1.5B")
     parser.add_argument("--max-examples", type=int, default=500)
-    parser.add_argument("--intellect-path", default="data/intellect_math_train_dev_test/test")
+    parser.add_argument("--intellect-path", default="data-distrib/intellect_math/test")
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.85)
     args = parser.parse_args()
 
