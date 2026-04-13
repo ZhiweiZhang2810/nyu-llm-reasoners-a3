@@ -12,9 +12,7 @@ from student.drgrpo_grader import question_only_reward_fn
 def load_prompt(name: str = "intellect") -> str:
     path = Path(__file__).parent / "prompts" / f"{name}.prompt"
     return path.read_text()
-
-
-def evaluate(llm, prompts, ground_truths, log_examples=False):
+def evaluate(llm, prompts, ground_truths):
     """Run evaluation and return accuracy."""
     params = SamplingParams(temperature=0.0, max_tokens=2048)
     outputs = llm.generate(prompts, params)
@@ -23,15 +21,15 @@ def evaluate(llm, prompts, ground_truths, log_examples=False):
     cat1_count = 0  # Format 1, Answer 1
     cat2_count = 0  # Format 1, Answer 0
     cat3_count = 0  # Format 0, Answer 0
-    
+
     for i, output in enumerate(tqdm(outputs, desc="Grading")):
         text = output.outputs[0].text
         reward = question_only_reward_fn(text, ground_truths[i])
         correct += reward["reward"]
-        
+
         f_rew = reward.get("format_reward", 0.0)
         a_rew = reward.get("answer_reward", 0.0)
-        
+
         if f_rew == 1.0 and a_rew == 1.0:
             cat1_count += 1
         elif f_rew == 1.0 and a_rew == 0.0:
@@ -39,18 +37,15 @@ def evaluate(llm, prompts, ground_truths, log_examples=False):
         elif f_rew == 0.0 and a_rew == 0.0:
             cat3_count += 1
 
-    if log_examples:
-        print("\n--- MATH Evaluation Statistics ---")
-        print(f"(1) Format Reward 1, Answer Reward 1: {cat1_count}")
-        print(f"(2) Format Reward 1, Answer Reward 0: {cat2_count}")
-        print(f"(3) Format Reward 0, Answer Reward 0: {cat3_count}")
-
     return correct / len(outputs)
 
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser()
+...
+    print(f"[Sample] {prompts[0][:200]}...")
+    acc = evaluate(llm, prompts, gts)
+    print(f"MATH Accuracy: {acc:.4f}")
+
     parser.add_argument("--model", default="Qwen/Qwen2.5-Math-1.5B")
     parser.add_argument("--max-examples", type=int, default=500)
     parser.add_argument("--intellect-path", default="data-distrib/intellect_math/test")
@@ -97,7 +92,7 @@ def main():
     gts = [ex["answer"] for ex in math_ds]
 
     print(f"[Sample] {prompts[0][:200]}...")
-    acc = evaluate(llm, prompts, gts, log_examples=True)
+    acc = evaluate(llm, prompts, gts)
     print(f"MATH Accuracy: {acc:.4f}")
 
 
