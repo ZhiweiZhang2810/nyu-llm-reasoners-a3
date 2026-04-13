@@ -6,7 +6,7 @@ from datasets import load_dataset, load_from_disk
 from tqdm import tqdm
 from vllm import LLM, SamplingParams
 
-from student.drgrpo_grader import question_only_reward_fn
+from cs336_alignment.drgrpo_grader import question_only_reward_fn
 
 
 def load_prompt(name: str = "intellect") -> str:
@@ -39,6 +39,11 @@ def evaluate(llm, prompts, ground_truths):
         elif f_rew == 0.0 and a_rew == 0.0:
             cat3_count += 1
 
+    print("\n--- Evaluation Statistics ---")
+    print(f"(1) Format Reward 1, Answer Reward 1: {cat1_count}")
+    print(f"(2) Format Reward 1, Answer Reward 0: {cat2_count}")
+    print(f"(3) Format Reward 0, Answer Reward 0: {cat3_count}")
+
     return correct / len(outputs)
 
 
@@ -47,7 +52,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="Qwen/Qwen2.5-Math-1.5B")
     parser.add_argument("--max-examples", type=int, default=500)
-    parser.add_argument("--intellect-path", default="data-distrib/intellect_math/test")
+    parser.add_argument("--intellect-path", default="data/intellect_math_train_dev_test/test")
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.85)
     args = parser.parse_args()
 
@@ -61,25 +66,22 @@ def main():
     )
 
     # Evaluate on Intellect test
-    if Path(args.intellect_path).exists():
-        print(f"\n=== Intellect Test ({args.intellect_path}) ===")
-        dataset = load_from_disk(args.intellect_path)
-        if args.max_examples:
-            dataset = dataset.select(range(min(args.max_examples, len(dataset))))
+    print(f"\n=== Intellect Test ({args.intellect_path}) ===")
+    dataset = load_from_disk(args.intellect_path)
+    if args.max_examples:
+        dataset = dataset.select(range(min(args.max_examples, len(dataset))))
 
-        prompts, gts = [], []
-        for ex in dataset:
-            msgs = ex.get("messages", [])
-            sys_msg = next((m["content"] for m in msgs if m["role"] == "system"), "")
-            user_msg = next((m["content"] for m in msgs if m["role"] == "user"), "")
-            prompts.append(sys_msg + "\n\n" + user_msg if sys_msg else user_msg)
-            gts.append(ex.get("ground_truth", ""))
+    prompts, gts = [], []
+    for ex in dataset:
+        msgs = ex.get("messages", [])
+        sys_msg = next((m["content"] for m in msgs if m["role"] == "system"), "")
+        user_msg = next((m["content"] for m in msgs if m["role"] == "user"), "")
+        prompts.append(sys_msg + "\n\n" + user_msg if sys_msg else user_msg)
+        gts.append(ex.get("ground_truth", ""))
 
-        print(f"[Sample] {prompts[0][:200]}...")
-        acc = evaluate(llm, prompts, gts)
-        print(f"Intellect Accuracy: {acc:.4f}")
-    else:
-        print(f"\n[Warning] Intellect path '{args.intellect_path}' not found. Skipping.")
+    print(f"[Sample] {prompts[0][:200]}...")
+    acc = evaluate(llm, prompts, gts)
+    print(f"Intellect Accuracy: {acc:.4f}")
 
     # Evaluate on MATH
     print("\n=== MATH Test ===")
