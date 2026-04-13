@@ -12,6 +12,8 @@ from student.drgrpo_grader import question_only_reward_fn
 def load_prompt(name: str = "intellect") -> str:
     path = Path(__file__).parent / "prompts" / f"{name}.prompt"
     return path.read_text()
+
+
 def evaluate(llm, prompts, ground_truths):
     """Run evaluation and return accuracy."""
     params = SamplingParams(temperature=0.0, max_tokens=2048)
@@ -41,11 +43,8 @@ def evaluate(llm, prompts, ground_truths):
 
 
 def main():
-...
-    print(f"[Sample] {prompts[0][:200]}...")
-    acc = evaluate(llm, prompts, gts)
-    print(f"MATH Accuracy: {acc:.4f}")
-
+    import argparse
+    parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="Qwen/Qwen2.5-Math-1.5B")
     parser.add_argument("--max-examples", type=int, default=500)
     parser.add_argument("--intellect-path", default="data-distrib/intellect_math/test")
