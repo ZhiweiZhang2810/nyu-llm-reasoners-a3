@@ -48,8 +48,14 @@ def main():
     # 2. Load Data
     if args.dataset == "intellect":
         ds = load_from_disk("data-distrib/intellect_math/train")
-        prompts = [ex["prompt"] for ex in ds]
-        gts = [ex["answer"] for ex in ds]
+        # Extract prompt from messages
+        prompts = [ex["messages"][0]["content"] + "\n" + ex["messages"][1]["content"] for ex in ds]
+        # For SFT, gts should be the reasoning trace
+        if args.mode == "sft":
+            gts = [ex["messages"][2]["content"] for ex in ds]
+        else:
+            # For GRPO, we need the answer for the reward function
+            gts = [ex["ground_truth"] for ex in ds]
         reward_fn = question_only_reward_fn
     else:
         # Load Countdown logic
@@ -58,6 +64,17 @@ def main():
         prompts = [prompt_template + "\n" + ex["problem"] for ex in ds]
         gts = [ex["answer"] for ex in ds]
         reward_fn = r1_zero_reward_fn
+
+    # Initialize vLLM if on Linux and vLLM is available
+    vllm_instance = None
+    if device != "mps" and args.mode == "grpo":
+        try:
+            from vllm import LLM
+            print("Initializing vLLM for fast sampling...")
+            # Qwen2.5-Math-1.5B fits on most GPUs
+            vllm_instance = LLM(model=model_id, device=device, gpu_memory_utilization=0.4, enforce_eager=True)
+        except ImportError:
+            print("vLLM not found, falling back to HF sampling.")
 
     # 3. Execute Training
     if args.mode == "sft":
@@ -121,7 +138,7 @@ def main():
             normalize_by_std=args.use_std_norm,
             length_normalization=args.length_norm,
             device=device,
-            vllm_instance=None # Ensure CPU/MPS fallback works natively
+            vllm_instance=vllm_instance
         )
         
         rewards = [h["reward_mean"] for h in history]
