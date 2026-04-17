@@ -103,7 +103,8 @@ def main():
         sft_prompts = prompts[:args.num_examples]
         sft_answers = gts[:args.num_examples]
         
-        optimizer = AdamW(model.parameters(), lr=args.lr)
+        # Strictly follow Page 24 recommendations: betas=(0.9, 0.95), weight_decay=0.0
+        optimizer = AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=0.0)
         batch_size = 4
         grad_accum = 4
         epochs = 3

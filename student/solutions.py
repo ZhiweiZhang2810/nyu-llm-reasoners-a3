@@ -356,7 +356,8 @@ def grpo_train_loop(
     from torch.optim import AdamW
     from tqdm import tqdm
     
-    optimizer = AdamW(policy.parameters(), lr=learning_rate)
+    # Strictly follow Page 24: betas=(0.9, 0.95), weight_decay=0.0
+    optimizer = AdamW(policy.parameters(), lr=learning_rate, betas=(0.9, 0.95), weight_decay=0.0)
     stats_history = []
     
     # Validation helper
@@ -390,13 +391,15 @@ def grpo_train_loop(
             if vllm_instance:
                 # vLLM path (high performance)
                 from vllm import SamplingParams
+                # Strictly follow Page 24: max_tokens=1024, temp=0.7
                 sampling_params = SamplingParams(temperature=0.7, max_tokens=1024)
                 outputs = vllm_instance.generate(repeated_prompts, sampling_params)
                 responses = [output.outputs[0].text for output in outputs]
             else:
                 # HF path (fallback)
                 inputs = tokenizer(repeated_prompts, return_tensors="pt", padding=True).to(device)
-                gen_outputs = policy.generate(**inputs, max_new_tokens=512, do_sample=True, temperature=0.7)
+                # Strictly follow Page 24: max_new_tokens=1024, temp=0.7
+                gen_outputs = policy.generate(**inputs, max_new_tokens=1024, do_sample=True, temperature=0.7)
                 # Decode only the generated part
                 responses = [tokenizer.decode(g[inputs.input_ids.shape[1]:], skip_special_tokens=True) for g in gen_outputs]
 
