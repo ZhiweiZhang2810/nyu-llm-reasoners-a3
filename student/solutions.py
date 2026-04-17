@@ -307,3 +307,124 @@ def grpo_microbatch_train_step(
     loss.backward()
 
     return loss, metadata
+
+
+def grpo_train_loop(
+    policy: torch.nn.Module,
+    tokenizer: PreTrainedTokenizerBase,
+    reward_fn: callable,
+    prompts: list[str],
+    ground_truths: list[str],
+    n_grpo_steps: int,
+    learning_rate: float,
+    group_size: int,
+    rollout_batch_size: int,
+    train_batch_size: int,
+    gradient_accumulation_steps: int,
+    loss_type: str,
+    cliprange: float = 0.2,
+    advantage_eps: float = 1e-6,
+    normalize_by_std: bool = True,
+    device: str = "cuda",
+    vllm_instance = None, # vLLM instance for fast sampling
+) -> list[dict]:
+    """Execute the full GRPO training loop."""
+    from torch.optim import AdamW
+    from tqdm import tqdm
+    
+    optimizer = AdamW(policy.parameters(), lr=learning_rate)
+    stats_history = []
+    
+    # Validation helper
+    def validate():
+        # This would call evaluate.py logic
+        pass
+
+    for step in tqdm(range(n_grpo_steps), desc="GRPO Steps"):
+        # 1. Sample a batch of prompts
+        indices = torch.randint(0, len(prompts), (rollout_batch_size // group_size,))
+        batch_prompts = [prompts[i] for i in indices]
+        batch_gts = [ground_truths[i] for i in indices]
+        
+        # Repeat prompts for group sampling
+        repeated_prompts = []
+        for p in batch_prompts:
+            repeated_prompts.extend([p] * group_size)
+        repeated_gts = []
+        for g in batch_gts:
+            repeated_gts.extend([g] * group_size)
+
+        # 2. Rollout (Generate responses)
+        # In a real setup, we use vLLM here. For local CPU, we use policy.generate.
+        policy.eval()
+        responses = []
+        with torch.no_grad():
+            if vllm_instance:
+                # vLLM path (high performance)
+                from vllm import SamplingParams
+                sampling_params = SamplingParams(temperature=0.7, max_tokens=1024)
+                outputs = vllm_instance.generate(repeated_prompts, sampling_params)
+                responses = [output.outputs[0].text for output in outputs]
+            else:
+                # HF path (fallback)
+                inputs = tokenizer(repeated_prompts, return_tensors="pt", padding=True).to(device)
+                gen_outputs = policy.generate(**inputs, max_new_tokens=512, do_sample=True, temperature=0.7)
+                # Decode only the generated part
+                responses = [tokenizer.decode(g[inputs.input_ids.shape[1]:], skip_special_tokens=True) for g in gen_outputs]
+
+        # 3. Compute rewards and advantages
+        advantages, raw_rewards, reward_metadata = compute_group_normalized_rewards(
+            reward_fn, responses, repeated_gts, group_size, advantage_eps, normalize_by_std
+        )
+        advantages = advantages.to(device)
+        
+        # 4. Get old log probs (for clipping)
+        # Tokenize responses for training
+        tokenized = tokenize_prompt_and_output(repeated_prompts, responses, tokenizer)
+        input_ids = tokenized["input_ids"].to(device)
+        labels = tokenized["labels"].to(device)
+        response_mask = tokenized["response_mask"].to(device)
+        
+        with torch.no_grad():
+            old_output = get_response_log_probs(policy, input_ids, labels)
+            old_log_probs = old_output["log_probs"]
+
+        # 5. Policy Update (One epoch per rollout batch)
+        policy.train()
+        # Shuffle rollout batch for microbatches
+        n_rollouts = len(responses)
+        indices = torch.randperm(n_rollouts)
+        
+        step_loss = 0
+        for i in range(0, n_rollouts, train_batch_size):
+            mb_idx = indices[i : i + train_batch_size]
+            
+            # Forward pass
+            mb_output = get_response_log_probs(policy, input_ids[mb_idx], labels[mb_idx])
+            mb_log_probs = mb_output["log_probs"]
+            
+            # Train step
+            loss, mb_metadata = grpo_microbatch_train_step(
+                policy_log_probs=mb_log_probs,
+                response_mask=response_mask[mb_idx],
+                gradient_accumulation_steps=gradient_accumulation_steps,
+                loss_type=loss_type,
+                raw_rewards=raw_rewards[mb_idx].to(device) if raw_rewards is not None else None,
+                advantages=advantages[mb_idx],
+                old_log_probs=old_log_probs[mb_idx],
+                cliprange=cliprange
+            )
+            step_loss += loss.item()
+            
+        optimizer.step()
+        optimizer.zero_grad()
+        
+        # Log stats
+        stats = {
+            "step": step,
+            "loss": step_loss,
+            "reward_mean": reward_metadata["reward_mean"],
+        }
+        stats_history.append(stats)
+        
+    return stats_history
