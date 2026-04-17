@@ -59,7 +59,7 @@ def main():
         reward_fn = question_only_reward_fn
     else:
         # Load Countdown logic
-        ds = load_from_disk("data-distrib/countdown/train")
+        ds = load_from_disk("data-distrib/countdown/dataset/train")
         prompt_template = load_prompt("countdown")
         prompts = [prompt_template + "\n" + ex["problem"] for ex in ds]
         gts = [ex["answer"] for ex in ds]
