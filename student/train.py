@@ -68,9 +68,10 @@ def main():
     else:
         # Load Countdown logic
         ds = load_from_disk("data-distrib/countdown/dataset/train")
-        prompt_template = load_prompt("countdown")
-        prompts = [prompt_template + "\n" + ex["problem"] for ex in ds]
-        gts = [ex["answer"] for ex in ds]
+        # Countdown dataset uses "prompt" as the list of messages
+        prompts = [ex["prompt"][0]["content"] + "\n" + ex["prompt"][1]["content"] for ex in ds]
+        # ground_truth is nested in reward_model
+        gts = [str(ex["reward_model"]["ground_truth"]["target"]) for ex in ds]
         reward_fn = r1_zero_reward_fn
 
     # Initialize vLLM if on Linux and vLLM is available
