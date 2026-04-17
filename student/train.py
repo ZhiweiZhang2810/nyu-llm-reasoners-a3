@@ -117,7 +117,11 @@ def main():
                     gradient_accumulation_steps=grad_accum
                 )
                 
-                loss_history.append(loss.item() * grad_accum)
+                current_loss = loss.item() * grad_accum
+                loss_history.append(current_loss)
+                
+                if (i // batch_size) % 10 == 0:
+                    print(f"Step {i//batch_size}: Loss = {current_loss:.4f}")
                 
                 if (i // batch_size + 1) % grad_accum == 0:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
