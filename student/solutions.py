@@ -418,6 +418,10 @@ def grpo_train_loop(
             old_log_probs = old_output["log_probs"]
 
         # 5. Policy Update (One epoch per rollout batch)
+        # Clear cache to free up memory from rollouts/vLLM
+        if device == "cuda":
+            torch.cuda.empty_cache()
+            
         policy.train()
         # Shuffle rollout batch for microbatches
         n_rollouts = len(responses)

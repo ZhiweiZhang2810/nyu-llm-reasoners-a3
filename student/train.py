@@ -53,6 +53,10 @@ def main():
     dtype = torch.bfloat16 if device != "mps" else torch.float32
     model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=dtype).to(device)
     
+    # Enable gradient checkpointing to save memory on GPU
+    if device == "cuda":
+        model.gradient_checkpointing_enable()
+    
     # 2. Load Data
     if args.dataset == "intellect":
         ds = load_from_disk("data-distrib/intellect_math/train")
@@ -88,8 +92,8 @@ def main():
         try:
             from vllm import LLM
             print("Initializing vLLM for fast sampling...")
-            # Qwen2.5-Math-1.5B fits on most GPUs
-            vllm_instance = LLM(model=model_id, device=device, gpu_memory_utilization=0.4, enforce_eager=True)
+            # Use a smaller utilization to leave more room for training
+            vllm_instance = LLM(model=model_id, device=device, gpu_memory_utilization=0.15, enforce_eager=True)
         except ImportError:
             print("vLLM not found, falling back to HF sampling.")
 
@@ -138,8 +142,6 @@ def main():
                     
         plot_and_save(loss_history, f"SFT Loss (N={args.num_examples})", "Steps", "Loss", f"sft_loss_n{args.num_examples}.png", args.output_dir)
         print("Evaluating on Intellect Test...")
-        # Simple eval logic for local testing without vLLM
-        # In a real run, you'd use evaluate.py with the saved model
         
     elif args.mode == "grpo":
         print(f"Starting GRPO with loss={args.loss_type}, lr={args.lr}, std_norm={args.use_std_norm}, length_norm={args.length_norm}...")
@@ -153,8 +155,8 @@ def main():
             learning_rate=args.lr,
             group_size=8,
             rollout_batch_size=16,
-            train_batch_size=4,
-            gradient_accumulation_steps=4,
+            train_batch_size=1, # Reduced microbatch size
+            gradient_accumulation_steps=16, # Increased accumulation steps
             loss_type=args.loss_type,
             normalize_by_std=args.use_std_norm,
             length_normalization=args.length_norm,
