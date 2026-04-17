@@ -56,6 +56,7 @@ def main():
     # Enable gradient checkpointing to save memory on GPU
     if device == "cuda":
         model.gradient_checkpointing_enable()
+        model.config.use_cache = False # Required for gradient checkpointing
     
     # 2. Load Data
     if args.dataset == "intellect":
@@ -105,8 +106,8 @@ def main():
         
         # Strictly follow Page 24 recommendations: betas=(0.9, 0.95), weight_decay=0.0
         optimizer = AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=0.0)
-        batch_size = 4
-        grad_accum = 4
+        batch_size = 1 # Reduced from 4 to 1 for memory stability
+        grad_accum = 16 # Increased from 4 to 16
         epochs = 3
         
         loss_history = []

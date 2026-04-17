@@ -49,6 +49,9 @@ def tokenize_prompt_and_output(
     
     if max_seq_len is None:
         max_seq_len = max(len(c) for _, _, c in encoded_pairs) if encoded_pairs else 0
+    
+    # Cap max_seq_len to a reasonable value for memory stability
+    max_seq_len = min(max_seq_len, 2048)
 
     # Use eos_token_id as padding if pad_token_id is not set
     pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
