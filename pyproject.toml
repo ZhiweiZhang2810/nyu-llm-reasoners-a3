@@ -18,6 +18,7 @@ dependencies = [
     "typer>=0.15.4",
     "vllm==0.7.2",
     "wandb>=0.19.8",
+    "matplotlib>=3.10.0",
     "xopen>=2.0.2",
     "datasets>=3.0.0",
 ]
