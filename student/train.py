@@ -56,22 +56,30 @@ def main():
     # 2. Load Data
     if args.dataset == "intellect":
         ds = load_from_disk("data-distrib/intellect_math/train")
-        # Extract prompt from messages
-        prompts = [ex["messages"][0]["content"] + "\n" + ex["messages"][1]["content"] for ex in ds]
-        # For SFT, gts should be the reasoning trace
+        # For Intellect: 
+        # msgs[0] = system, msgs[1] = user, msgs[2] = assistant (reasoning + answer)
+        prompts = []
+        for ex in ds:
+            msgs = ex["messages"]
+            p = ""
+            if msgs[0]["role"] == "system":
+                p += msgs[0]["content"] + "\n"
+            if msgs[1]["role"] == "user":
+                p += msgs[1]["content"]
+            prompts.append(p)
+            
         if args.mode == "sft":
+            # Target is the assistant's reasoning trace
             gts = [ex["messages"][2]["content"] for ex in ds]
         else:
-            # For GRPO, we need the answer for the reward function
             gts = [ex["ground_truth"] for ex in ds]
         reward_fn = question_only_reward_fn
     else:
-        # Load Countdown logic
         ds = load_from_disk("data-distrib/countdown/dataset/train")
-        # Countdown dataset uses "prompt" as the list of messages
-        prompts = [ex["prompt"][0]["content"] + "\n" + ex["prompt"][1]["content"] for ex in ds]
-        # ground_truth is nested in reward_model
-        gts = [str(ex["reward_model"]["ground_truth"]["target"]) for ex in ds]
+        # For Countdown: "prompt" is a list with one 'user' dict containing the whole prompt
+        prompts = [ex["prompt"][0]["content"] for ex in ds]
+        # Target for GRPO is the number
+        gts = [str(ex["target"]) for ex in ds]
         reward_fn = r1_zero_reward_fn
 
     # Initialize vLLM if on Linux and vLLM is available

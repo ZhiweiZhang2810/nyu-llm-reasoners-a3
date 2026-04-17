@@ -63,16 +63,32 @@ def tokenize_prompt_and_output(
         labels = combined[1:]
 
         # response_mask: 1 for tokens in labels that come from o_ids
-        # In 'combined', o_ids start at index len(p_ids).
-        # In 'labels' (which is combined[1:]), o_ids start at index len(p_ids) - 1.
+        # Let's find the start of the output in the labels tensor reliably.
+        # labels = [p[1], p[2], ..., p[n], o[0], o[1], ..., o[m], EOS]
+        # The prompt has len(p_ids) tokens.
+        # Labels has len(combined) - 1 tokens.
         mask = [False] * len(labels)
+        
+        # Start of output in labels is at index len(p_ids) - 1
+        # (because combined[len(p_ids)] is the first output token)
         start_idx = len(p_ids) - 1
-        # The number of response tokens in 'labels' is len(o_ids) + 1 (the EOS token)
-        # unless it was truncated.
-        end_idx = start_idx + len(o_ids) + 1 # Include EOS token in training
+        # The number of response tokens to train on is len(o_ids) + 1 (for EOS)
+        # We need to be careful if tokenizer added a BOS to o_ids.
+        actual_o_ids = o_ids
+        if len(o_ids) > 0 and o_ids[0] == tokenizer.bos_token_id:
+            actual_o_ids = o_ids[1:]
+            start_idx += 1
+            
+        end_idx = start_idx + len(actual_o_ids) + 1
         
         for i in range(start_idx, end_idx):
             if i < len(labels):
+                mask[i] = True
+
+        # Sanity check: if mask is still empty, something is wrong with tokenization
+        if not any(mask) and len(output_strs[0]) > 0:
+            # Fallback: mask the last part of the sequence
+            for i in range(max(0, len(labels)-len(o_ids)-1), len(labels)):
                 mask[i] = True
 
         batch_input_ids.append(torch.tensor(input_ids))
