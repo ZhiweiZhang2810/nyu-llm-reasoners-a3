@@ -182,20 +182,17 @@ def sft_microbatch_train_step(
     gradient_accumulation_steps: int,
     normalize_constant: float = 1.0,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
-    """Compute the policy gradient loss and backprop its gradients for a microbatch.
-    The loss is summed over response tokens per instance, then averaged over the batch.
+    """Compute the SFT loss and backprop its gradients for a microbatch.
+    The loss is averaged over response tokens.
     """
     # Negative log-likelihood over response tokens
-    per_token_loss = -policy_log_probs * response_mask
+    per_token_loss = -policy_log_probs
     
-    # Sum over response tokens for each instance
-    per_instance_loss = torch.sum(per_token_loss, dim=-1)
+    # Use our masked_mean helper to average over the response mask
+    loss = masked_mean(per_token_loss, response_mask)
     
-    # Average over the batch
-    batch_loss = torch.mean(per_instance_loss)
-    
-    # Normalize by constant and grad accumulation steps
-    loss = batch_loss / (normalize_constant * gradient_accumulation_steps)
+    # Scale by grad accumulation steps
+    loss = loss / gradient_accumulation_steps
 
     loss.backward()
 

@@ -93,8 +93,15 @@ def main():
         try:
             from vllm import LLM
             print("Initializing vLLM for fast sampling...")
-            # Use a smaller utilization to leave more room for training
-            vllm_instance = LLM(model=model_id, device=device, gpu_memory_utilization=0.15, enforce_eager=True)
+            # Qwen2.5-Math-1.5B needs about 3GB for weights. 
+            # 25% of 40GB is 10GB, leaving 7GB for KV cache, which is plenty.
+            vllm_instance = LLM(
+                model=model_id, 
+                device=device, 
+                gpu_memory_utilization=0.25, 
+                enforce_eager=True,
+                seed=42
+            )
         except ImportError:
             print("vLLM not found, falling back to HF sampling.")
 
@@ -106,8 +113,8 @@ def main():
         
         # Strictly follow Page 24 recommendations: betas=(0.9, 0.95), weight_decay=0.0
         optimizer = AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=0.0)
-        batch_size = 1 # Reduced from 4 to 1 for memory stability
-        grad_accum = 16 # Increased from 4 to 16
+        batch_size = 1 # Reduced for memory stability
+        grad_accum = 16 
         epochs = 3
         
         loss_history = []
@@ -143,7 +150,6 @@ def main():
                     optimizer.zero_grad()
                     
         plot_and_save(loss_history, f"SFT Loss (N={args.num_examples})", "Steps", "Loss", f"sft_loss_n{args.num_examples}.png", args.output_dir)
-        print("Evaluating on Intellect Test...")
         
     elif args.mode == "grpo":
         print(f"Starting GRPO with loss={args.loss_type}, lr={args.lr}, std_norm={args.use_std_norm}, length_norm={args.length_norm}...")
