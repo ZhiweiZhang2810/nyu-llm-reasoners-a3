@@ -5,17 +5,19 @@ description = "NYU Building LLM Reasoners Assignment 3: Alignment"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"  # Python 3.13 not yet supported for some deps
 dependencies = [
+    "accelerate>=1.5.2",
+    "alpaca-eval",
     "jupyter>=1.1.1",
     "math-verify[antlr4-13-2]>=0.7.0",
-    "numpy<2.0",
-    "pyarrow>=14.0.0,<18.0.0",
     "pylatexenc==2.10",
     "notebook>=7.4.2",
     "pytest>=8.3.5",
-    "torch>=2.2.0,<2.3.0",
+    "torch",
     "tqdm>=4.67.1",
     "transformers>=4.45.0,<4.49.0",
     "typer>=0.15.4",
+    "vllm==0.7.2",
+    "wandb>=0.19.8",
     "xopen>=2.0.2",
     "datasets>=3.0.0",
 ]
@@ -26,7 +28,10 @@ include = ["student"]
 [tool.uv]
 package = true
 
+
+[tool.uv.sources]
+alpaca-eval = { git = "https://github.com/nelson-liu/alpaca_eval.git", rev = "forward_kwargs_to_vllm" }
+
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "WARNING"
-
