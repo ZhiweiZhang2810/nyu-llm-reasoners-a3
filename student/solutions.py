@@ -287,6 +287,7 @@ def grpo_microbatch_train_step(
     advantages: torch.Tensor | None = None,
     old_log_probs: torch.Tensor | None = None,
     cliprange: float | None = None,
+    length_normalization: str = "masked_mean",
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     """Compute the policy gradient loss and backprop its gradients for a microbatch."""
     per_token_loss, metadata = compute_policy_gradient_loss(
@@ -298,8 +299,13 @@ def grpo_microbatch_train_step(
         cliprange=cliprange,
     )
 
-    # Aggregate over response tokens using masked_mean
-    loss = masked_mean(per_token_loss, response_mask)
+    # Aggregate over response tokens
+    if length_normalization == "masked_mean":
+        loss = masked_mean(per_token_loss, response_mask)
+    elif length_normalization == "masked_normalize":
+        loss = masked_normalize(per_token_loss, response_mask, normalize_constant=1.0)
+    else:
+        raise ValueError(f"Unknown length_normalization: {length_normalization}")
 
     # Scale by gradient accumulation
     loss = loss / gradient_accumulation_steps
@@ -325,6 +331,7 @@ def grpo_train_loop(
     cliprange: float = 0.2,
     advantage_eps: float = 1e-6,
     normalize_by_std: bool = True,
+    length_normalization: str = "masked_mean",
     device: str = "cuda",
     vllm_instance = None, # vLLM instance for fast sampling
 ) -> list[dict]:
@@ -412,7 +419,8 @@ def grpo_train_loop(
                 raw_rewards=raw_rewards[mb_idx].to(device) if raw_rewards is not None else None,
                 advantages=advantages[mb_idx],
                 old_log_probs=old_log_probs[mb_idx],
-                cliprange=cliprange
+                cliprange=cliprange,
+                length_normalization=length_normalization
             )
             step_loss += loss.item()
             
@@ -428,3 +436,4 @@ def grpo_train_loop(
         stats_history.append(stats)
         
     return stats_history
+
