@@ -3,13 +3,21 @@ import torch
 import json
 import os
 import matplotlib.pyplot as plt
+plt.switch_backend('Agg')
 from datasets import load_dataset, load_from_disk
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, PreTrainedModel
 from torch.optim import AdamW
 from tqdm import tqdm
 from student import solutions
 from student.drgrpo_grader import question_only_reward_fn, r1_zero_reward_fn
 from student.evaluate import evaluate, load_prompt
+
+def load_policy_into_vllm_instance(policy: PreTrainedModel, llm):
+    """Sync torch policy weights into vLLM engine."""
+    state_dict = policy.state_dict()
+    # Path might vary slightly depending on vLLM version, but this is standard for 0.7.x
+    llm_model = llm.llm_engine.model_executor.driver_worker.model_runner.model
+    llm_model.load_weights(state_dict.items())
 
 def plot_and_save(data, title, xlabel, ylabel, filename, output_dir):
     os.makedirs(output_dir, exist_ok=True)
@@ -138,7 +146,8 @@ def main():
             normalize_by_std=args.use_std_norm,
             length_normalization=args.length_norm,
             device=device,
-            vllm_instance=vllm_instance
+            vllm_instance=vllm_instance,
+            vllm_sync_fn=load_policy_into_vllm_instance
         )
         
         rewards = [h["reward_mean"] for h in history]

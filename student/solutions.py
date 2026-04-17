@@ -36,25 +36,23 @@ def tokenize_prompt_and_output(
     batch_labels = []
     batch_response_mask = []
 
-    # The snapshot implies a max sequence length of 10
-    max_seq_len = 10
+    # Set max_seq_len based on the longest combined sequence in the batch
+    # instead of hardcoding a small value like 10.
+    encoded_pairs = []
+    for prompt, output in zip(prompt_strs, output_strs):
+        p_ids = tokenizer.encode(prompt, add_special_tokens=True)
+        o_ids = tokenizer.encode(output, add_special_tokens=False)
+        combined = p_ids + o_ids + [tokenizer.eos_token_id]
+        encoded_pairs.append((p_ids, o_ids, combined))
+    
+    max_seq_len = max(len(c) for _, _, c in encoded_pairs) if encoded_pairs else 0
 
     # Use eos_token_id as padding if pad_token_id is not set
     pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
     if pad_token_id is None:
         pad_token_id = 0
 
-    for prompt, output in zip(prompt_strs, output_strs):
-        # Tokenize prompt and output separately to avoid boundary merging
-        p_ids = tokenizer.encode(prompt, add_special_tokens=True)
-        o_ids = tokenizer.encode(output, add_special_tokens=False)
-        
-        # Combine: prompt + output + EOS
-        combined = p_ids + o_ids + [tokenizer.eos_token_id]
-        
-        # Truncate to max_seq_len
-        combined = combined[:max_seq_len]
-        
+    for p_ids, o_ids, combined in encoded_pairs:
         # Padding to max_seq_len
         if len(combined) < max_seq_len:
             combined = combined + [pad_token_id] * (max_seq_len - len(combined))
@@ -334,6 +332,7 @@ def grpo_train_loop(
     length_normalization: str = "masked_mean",
     device: str = "cuda",
     vllm_instance = None, # vLLM instance for fast sampling
+    vllm_sync_fn = None, # Function to sync policy weights to vLLM
 ) -> list[dict]:
     """Execute the full GRPO training loop."""
     from torch.optim import AdamW
@@ -348,6 +347,10 @@ def grpo_train_loop(
         pass
 
     for step in tqdm(range(n_grpo_steps), desc="GRPO Steps"):
+        # Sync vLLM weights if using vLLM
+        if vllm_instance and vllm_sync_fn:
+            vllm_sync_fn(policy, vllm_instance)
+
         # 1. Sample a batch of prompts
         indices = torch.randint(0, len(prompts), (rollout_batch_size // group_size,))
         batch_prompts = [prompts[i] for i in indices]
