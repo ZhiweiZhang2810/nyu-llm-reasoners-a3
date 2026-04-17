@@ -5,12 +5,12 @@ STEPS=200
 OUTPUT_DIR="./outputs"
 mkdir -p $OUTPUT_DIR
 
-echo "Starting SFT Experiments..."
-for N in 128 256 512 1024
-do
-    echo "Running SFT with N=$N..."
-    uv run student/train.py --mode sft --num_examples $N --output_dir $OUTPUT_DIR
-done
+# echo "Starting SFT Experiments..."
+# for N in 128 256 512 1024
+# do
+#     echo "Running SFT with N=$N..."
+#     uv run student/train.py --mode sft --num_examples $N --output_dir $OUTPUT_DIR
+# done
 
 echo "Starting GRPO Countdown Baseline & LR Sweep..."
 for LR in 1e-5 5e-6 2e-6
