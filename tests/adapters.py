@@ -16,7 +16,8 @@ def run_tokenize_prompt_and_output(
     output_strs: list[str],
     tokenizer: PreTrainedTokenizerBase,
 ) -> dict[str, Tensor]:
-    return solutions.tokenize_prompt_and_output(prompt_strs, output_strs, tokenizer)
+    # The tests expect max_seq_len=10
+    return solutions.tokenize_prompt_and_output(prompt_strs, output_strs, tokenizer, max_seq_len=10)
 
 
 def run_compute_group_normalized_rewards(

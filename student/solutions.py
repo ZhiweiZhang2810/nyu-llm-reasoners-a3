@@ -17,6 +17,7 @@ def tokenize_prompt_and_output(
     prompt_strs: list[str],
     output_strs: list[str],
     tokenizer: PreTrainedTokenizerBase,
+    max_seq_len: int | None = None,
 ) -> dict[str, Tensor]:
     """Tokenize the prompt and output strings, and construct a mask that is 1
     for the response tokens and 0 for other tokens (prompt or padding).
@@ -25,12 +26,13 @@ def tokenize_prompt_and_output(
         prompt_strs: list[str], the prompt strings.
         output_strs: list[str], the output strings.
         tokenizer: PreTrainedTokenizer, the tokenizer to use.
+        max_seq_len: int | None, the maximum sequence length.
 
     Returns:
         dict[str, torch.Tensor]:
-            "input_ids": torch.Tensor of shape (batch_size, max_seq_len - 1)
-            "labels": torch.Tensor of shape (batch_size, max_seq_len - 1)
-            "response_mask": torch.Tensor of shape (batch_size, max_seq_len - 1)
+            "input_ids": torch.Tensor of shape (batch_size, seq_len - 1)
+            "labels": torch.Tensor of shape (batch_size, seq_len - 1)
+            "response_mask": torch.Tensor of shape (batch_size, seq_len - 1)
     """
     batch_input_ids = []
     batch_labels = []
@@ -45,7 +47,8 @@ def tokenize_prompt_and_output(
         combined = p_ids + o_ids + [tokenizer.eos_token_id]
         encoded_pairs.append((p_ids, o_ids, combined))
     
-    max_seq_len = max(len(c) for _, _, c in encoded_pairs) if encoded_pairs else 0
+    if max_seq_len is None:
+        max_seq_len = max(len(c) for _, _, c in encoded_pairs) if encoded_pairs else 0
 
     # Use eos_token_id as padding if pad_token_id is not set
     pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
@@ -53,6 +56,10 @@ def tokenize_prompt_and_output(
         pad_token_id = 0
 
     for p_ids, o_ids, combined in encoded_pairs:
+        # Truncate to max_seq_len if necessary
+        if len(combined) > max_seq_len:
+            combined = combined[:max_seq_len]
+            
         # Padding to max_seq_len
         if len(combined) < max_seq_len:
             combined = combined + [pad_token_id] * (max_seq_len - len(combined))
@@ -63,23 +70,16 @@ def tokenize_prompt_and_output(
         labels = combined[1:]
 
         # response_mask: 1 for tokens in labels that come from o_ids
-        # Let's find the start of the output in the labels tensor reliably.
-        # labels = [p[1], p[2], ..., p[n], o[0], o[1], ..., o[m], EOS]
-        # The prompt has len(p_ids) tokens.
-        # Labels has len(combined) - 1 tokens.
         mask = [False] * len(labels)
         
         # Start of output in labels is at index len(p_ids) - 1
-        # (because combined[len(p_ids)] is the first output token)
         start_idx = len(p_ids) - 1
-        # The number of response tokens to train on is len(o_ids) + 1 (for EOS)
-        # We need to be careful if tokenizer added a BOS to o_ids.
         actual_o_ids = o_ids
         if len(o_ids) > 0 and o_ids[0] == tokenizer.bos_token_id:
             actual_o_ids = o_ids[1:]
             start_idx += 1
             
-        end_idx = start_idx + len(actual_o_ids) + 1
+        end_idx = start_idx + len(actual_o_ids)
         
         for i in range(start_idx, end_idx):
             if i < len(labels):
