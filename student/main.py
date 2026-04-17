@@ -1,15 +1,3 @@
-# /// script
-# dependencies = [
-#   "torch",
-#   "transformers",
-#   "pandas",
-#   "tqdm",
-#   "matplotlib",
-#   "seaborn",
-#   "datasets"
-# ]
-# ///
-
 import os
 import torch
 import pandas as pd
