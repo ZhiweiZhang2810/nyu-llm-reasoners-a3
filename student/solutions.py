@@ -63,12 +63,14 @@ def tokenize_prompt_and_output(
         labels = combined[1:]
 
         # response_mask: 1 for tokens in labels that come from o_ids
-        # In 'combined', o_ids are at indices [len(p_ids), len(p_ids) + len(o_ids) - 1]
-        # In 'labels' (which is combined[1:]), o_ids are at [len(p_ids) - 1, len(p_ids) + len(o_ids) - 2]
-        # We also need to account for truncation at max_seq_len.
+        # In 'combined', o_ids start at index len(p_ids).
+        # In 'labels' (which is combined[1:]), o_ids start at index len(p_ids) - 1.
         mask = [False] * len(labels)
         start_idx = len(p_ids) - 1
-        end_idx = len(p_ids) + len(o_ids) - 1
+        # The number of response tokens in 'labels' is len(o_ids) + 1 (the EOS token)
+        # unless it was truncated.
+        end_idx = start_idx + len(o_ids) + 1 # Include EOS token in training
+        
         for i in range(start_idx, end_idx):
             if i < len(labels):
                 mask[i] = True
