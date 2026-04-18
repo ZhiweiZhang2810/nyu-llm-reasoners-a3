@@ -270,14 +270,14 @@ def main():
     BEST_LOSS = "reinforce_with_baseline" # <--- 根据实验 2 修改
     
     # 实验 3: Length Normalization (密切关注 wandb 上的 grad_norm 曲线)
-    run_grpo_experiment("Norm_Masked_Mean", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm="masked_mean")
-    run_grpo_experiment("Norm_Masked_Normalize", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm="masked_normalize")
+    # run_grpo_experiment("Norm_Masked_Mean", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm="masked_mean")
+    # run_grpo_experiment("Norm_Masked_Normalize", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm="masked_normalize")
 
     BEST_NORM = "masked_normalize" # <--- 根据实验 3 修改
     
     # 实验 4: Standard Deviation Normalization
-    # run_grpo_experiment("StdNorm_True", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm=BEST_NORM, use_std_norm=True)
-    # run_grpo_experiment("StdNorm_False", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm=BEST_NORM, use_std_norm=False)
+    run_grpo_experiment("StdNorm_True", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm=BEST_NORM, use_std_norm=True)
+    run_grpo_experiment("StdNorm_False", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm=BEST_NORM, use_std_norm=False)
 
 if __name__ == "__main__":
     main()
