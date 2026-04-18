@@ -50,7 +50,7 @@ class Config:
     dataset_sizes = [128, 256, 512, 1024, "full"]
     lr = 1e-5
     batch_size = 16 
-    grad_acc = 4
+    grad_acc = 16
     max_steps = 200 # 如果 loss 没有下降 40%，可以适当增加步数
     eval_interval = 20
     data_dir = "./data-distrib"
@@ -132,7 +132,7 @@ def run_sft_experiment(size, train_df, val_df, test_df, tokenizer, llm):
         for _, row in batch.iterrows():
             question = row['prompt'] if 'prompt' in row else row['messages'][1]['content']
             ans = row['answer'] if 'answer' in row else row['messages'][2]['content']
-            full_prompt = f"Solve the following math problem efficiently and clearly. Think carefully and step by step about your response and reason before providing a final response. Conclude your response with:\nTherefore, the final answer is: $\\boxed{ans}$. I hope it is correct.\n\nQuestion: {question}"
+            full_prompt = f"Solve the following math problem efficiently and clearly. Think carefully and step by step about your response and reason before providing a final response. Conclude your response with:\nTherefore, the final answer is: $\\boxed{{answer}}$. I hope it is correct.\n\nQuestion: {question}"
             prompt_list.append(full_prompt)
             answer_list.append(ans)
         
