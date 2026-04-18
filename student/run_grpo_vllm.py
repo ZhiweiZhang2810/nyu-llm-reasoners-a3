@@ -170,8 +170,13 @@ def run_grpo_experiment(exp_name, train_df, val_df, tokenizer, llm,
                 b_gts.append(gts[i])
                 
         # 3. 计算 Reward 和 Advantages
-        advantages, raw_rewards = compute_group_normalized_rewards(
-            countdown_reward_fn, b_responses, b_gts, Config.group_size, std_norm=use_std_norm
+        advantages, raw_rewards, reward_meta = compute_group_normalized_rewards(
+            countdown_reward_fn, 
+            b_responses, 
+            b_gts, 
+            Config.group_size, 
+            advantage_eps=1e-6,              # 补充你源码里需要的 eps
+            normalize_by_std=use_std_norm    # 使用你源码里真正的参数名
         )
         advantages = advantages.to(Config.train_device)
         
