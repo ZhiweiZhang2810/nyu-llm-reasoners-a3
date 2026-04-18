@@ -132,7 +132,7 @@ def run_sft_experiment(size, train_df, val_df, test_df, tokenizer, llm):
         for _, row in batch.iterrows():
             question = row['prompt'] if 'prompt' in row else row['messages'][1]['content']
             ans = row['answer'] if 'answer' in row else row['messages'][2]['content']
-            full_prompt = f"Solve the following math problem efficiently and clearly. Think carefully and step by step about your response and reason before providing a final response. Conclude your response with:\nTherefore, the final answer is: $\\boxed{answer}$. I hope it is correct.\n\nQuestion: {question}"
+            full_prompt = f"Solve the following math problem efficiently and clearly. Think carefully and step by step about your response and reason before providing a final response. Conclude your response with:\nTherefore, the final answer is: $\\boxed{ans}$. I hope it is correct.\n\nQuestion: {question}"
             prompt_list.append(full_prompt)
             answer_list.append(ans)
         
