@@ -31,34 +31,41 @@ def tokenize_prompt_and_output(
         p_ids = tokenizer.encode(prompt, add_special_tokens=True)
         o_ids = tokenizer.encode(output, add_special_tokens=False)
         
-        # Handle bos token leakage from output encoding if present
         if len(o_ids) > 0 and o_ids[0] == tokenizer.bos_token_id:
             o_ids = o_ids[1:]
             
         combined = p_ids + o_ids + [tokenizer.eos_token_id]
         encoded_pairs.append((p_ids, o_ids, combined))
     
+    # The tests expect the FINAL tensors to have width max_seq_len - 1.
+    # Therefore, combined needs to be max_seq_len.
     if max_seq_len is None:
         max_seq_len = max(len(c) for _, _, c in encoded_pairs) if encoded_pairs else 0
     
-    # Cap max_seq_len to a reasonable value for memory stability
     max_seq_len = min(max_seq_len, 2048)
+    # target_combined_len should be max_seq_len, so that [:-1] gives max_seq_len - 1
+    target_combined_len = max_seq_len
+    
     pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
 
     for p_ids, o_ids, combined in encoded_pairs:
-        if len(combined) > max_seq_len:
-            combined = combined[:max_seq_len]
-        elif len(combined) < max_seq_len:
-            combined = combined + [pad_token_id] * (max_seq_len - len(combined))
+        # Pad or truncate to max_seq_len
+        if len(combined) > target_combined_len:
+            combined = combined[:target_combined_len]
+        elif len(combined) < target_combined_len:
+            combined = combined + [pad_token_id] * (target_combined_len - len(combined))
 
+        # input_ids and labels will have length max_seq_len - 1
         input_ids = combined[:-1]
         labels = combined[1:]
         
-        # response_mask: 1 for tokens in labels that come from o_ids
         mask = [False] * len(labels)
-        start_idx = len(p_ids) - 1
         
-        # 顺从快照测试要求，排除最后的 EOS token 参与 mask 计算
+        # The first token of the response is the first element of o_ids.
+        # It is the label for the last token of p_ids.
+        start_idx = max(0, len(p_ids) - 1)
+        
+        # Adjust end_idx to match test snapshot expectations
         end_idx = min(start_idx + len(o_ids), len(labels))
         
         for i in range(start_idx, end_idx):
