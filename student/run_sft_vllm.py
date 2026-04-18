@@ -1,15 +1,3 @@
-# /// script
-# dependencies = [
-#   "torch",
-#   "transformers",
-#   "pandas",
-#   "tqdm",
-#   "datasets",
-#   "vllm",
-#   "wandb"
-# ]
-# ///
-
 import os
 import torch
 import wandb
