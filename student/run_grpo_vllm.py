@@ -200,10 +200,16 @@ def run_grpo_experiment(exp_name, train_df, val_df, tokenizer, llm,
             mb_idx = slice(i, i + mb_size)
             log_probs = get_response_log_probs(model, input_ids[mb_idx], labels[mb_idx])["log_probs"]
             
-            # 适配你的 Solutions 函数。如果你的解决方案不支持 length_norm 参数，请根据需要微调此处
-            loss = grpo_microbatch_train_step(
-                log_probs, mask[mb_idx], Config.grad_acc, loss_type, advantages[mb_idx], old_log_probs[mb_idx], 
-                cliprange=0.2, length_norm=length_norm
+            loss, _ = grpo_microbatch_train_step(
+                policy_log_probs=log_probs,
+                response_mask=mask[mb_idx],
+                gradient_accumulation_steps=Config.grad_acc,
+                loss_type=loss_type,
+                raw_rewards=raw_rewards[mb_idx].to(Config.train_device),
+                advantages=advantages[mb_idx],
+                old_log_probs=old_log_probs[mb_idx],
+                cliprange=0.2,
+                length_normalization=length_norm
             )
             total_loss += loss.item()
             
