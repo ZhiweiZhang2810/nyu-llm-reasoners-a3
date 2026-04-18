@@ -2,6 +2,7 @@ import os
 import re
 import torch
 import wandb
+import ast
 import pandas as pd
 from tqdm import tqdm
 from datasets import load_from_disk
@@ -55,20 +56,59 @@ class Config:
     eval_interval = 10
 
 # 简单的 Countdown 奖励函数
+import ast
+
 def countdown_reward_fn(response_text, gt):
-    # 提取 <answer>...</answer> 中的内容
+    """
+    专门为 Countdown 游戏编写的奖励判定。
+    要求模型生成的等式：1. 计算结果等于 target; 2. 使用的数字与给定的数字集完全一致。
+    """
     match = re.search(r"<answer>(.*?)</answer>", response_text, re.DOTALL)
     if not match: 
         return {"reward": 0.0}
-    ans = match.group(1).strip()
-    return {"reward": 1.0 if ans == str(gt).strip() else 0.0}
+    
+    equation = match.group(1).strip()
+    target = gt['target']
+    # 将 numpy array 转换为排序后的列表，以便比对
+    allowed_nums = sorted([int(x) for x in gt['numbers']])
+    
+    # 1. 验证模型使用的数字是否和题目要求的一模一样
+    nums_in_eq = [int(n) for n in re.findall(r'\d+', equation)]
+    if sorted(nums_in_eq) != allowed_nums:
+        return {"reward": 0.0}
+        
+    # 2. 简单的防注入安全校验，只允许数字和基础运算符
+    if not re.match(r'^[\d\+\-\*\/\(\)\s]+$', equation):
+        return {"reward": 0.0}
+        
+    # 3. 计算算式结果是否等于 Target
+    try:
+        result = eval(equation)
+        if abs(result - target) < 1e-5:
+            return {"reward": 1.0}
+    except:
+        pass # 处理被 0 除等非法算式
+        
+    return {"reward": 0.0}
 
 def evaluate_countdown_vllm(policy_model, llm, tokenizer, eval_df, step, limit=200):
     load_policy_into_vllm_instance(policy_model, llm)
     
-    prompts = eval_df['prompt'].tolist()[:limit]
-    gts = eval_df['answer'].tolist()[:limit]
-    
+    prompts = []
+    gts = []
+    for i in range(min(len(eval_df), limit)):
+        row = eval_df.iloc[i]
+        
+        # 1. 精准提取 prompt 并应用 Qwen 的 Chat Template
+        msgs = row['prompt']
+        if isinstance(msgs, str): 
+            msgs = ast.literal_eval(msgs) # 防御性转换
+        prompt_str = tokenizer.apply_chat_template(list(msgs), tokenize=False, add_generation_prompt=True)
+        prompts.append(prompt_str)
+        
+        # 2. 精准提取 ground_truth
+        gts.append(row['reward_model']['ground_truth'])
+        
     sampling_params = SamplingParams(temperature=0.0, max_tokens=1024)
     outputs = llm.generate(prompts, sampling_params, use_tqdm=False)
     
@@ -102,11 +142,21 @@ def run_grpo_experiment(exp_name, train_df, val_df, tokenizer, llm,
     rollout_params = SamplingParams(temperature=0.7, max_tokens=1024, n=Config.group_size)
 
     for step in tqdm(range(Config.max_steps), desc=exp_name):
-        # 1. 采样 prompt
+        # 1. 采样 prompt 与数据清洗 (新版本，完美适配 Countdown)
         num_prompts = Config.rollout_batch_size // Config.group_size
         batch_df = train_df.sample(n=num_prompts, replace=True)
-        prompts = batch_df['prompt'].tolist()
-        gts = batch_df['answer'].tolist()
+        
+        prompts = []
+        gts = []
+        for _, row in batch_df.iterrows():
+            msgs = row['prompt']
+            if isinstance(msgs, str): 
+                msgs = ast.literal_eval(msgs)
+            # 把原始的字典列表转换成 Qwen 认识的纯文本 prompt
+            prompt_str = tokenizer.apply_chat_template(list(msgs), tokenize=False, add_generation_prompt=True)
+            prompts.append(prompt_str)
+            # 从嵌套字典里精准提取 target 和 numbers
+            gts.append(row['reward_model']['ground_truth'])
         
         # 2. vLLM 生成 Responses
         load_policy_into_vllm_instance(model, llm)
