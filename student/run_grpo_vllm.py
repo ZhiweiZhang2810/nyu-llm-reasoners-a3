@@ -264,14 +264,14 @@ def main():
     BEST_LR = 2e-5 # <--- 根据前 3 个的结果修改这个值
     
     # 实验 2: Baseline 消融 (使用 BEST_LR)
-    run_grpo_experiment("No_Baseline", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type="no_baseline")
-    run_grpo_experiment("With_Baseline", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type="reinforce_with_baseline")
+    # run_grpo_experiment("No_Baseline", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type="no_baseline")
+    # run_grpo_experiment("With_Baseline", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type="reinforce_with_baseline")
     
     BEST_LOSS = "reinforce_with_baseline" # <--- 根据实验 2 修改
     
     # 实验 3: Length Normalization (密切关注 wandb 上的 grad_norm 曲线)
-    # run_grpo_experiment("Norm_Masked_Mean", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm="masked_mean")
-    # run_grpo_experiment("Norm_Masked_Normalize", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm="masked_normalize")
+    run_grpo_experiment("Norm_Masked_Mean", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm="masked_mean")
+    run_grpo_experiment("Norm_Masked_Normalize", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type=BEST_LOSS, length_norm="masked_normalize")
 
     BEST_NORM = "masked_normalize" # <--- 根据实验 3 修改
     
