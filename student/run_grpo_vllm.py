@@ -257,15 +257,15 @@ def main():
     
     # 实验 1: LR Sweep (跑完后找出达到 30% Acc 的最好 LR 填入后文)
     
-    run_grpo_experiment("LR_5e-6", train_df, val_df, tokenizer, llm, lr=5e-6)
-    run_grpo_experiment("LR_1e-5", train_df, val_df, tokenizer, llm, lr=1e-5)
-    run_grpo_experiment("LR_2e-5", train_df, val_df, tokenizer, llm, lr=2e-5)
+    # run_grpo_experiment("LR_5e-6", train_df, val_df, tokenizer, llm, lr=5e-6)
+    # run_grpo_experiment("LR_1e-5", train_df, val_df, tokenizer, llm, lr=1e-5)
+    # run_grpo_experiment("LR_2e-5", train_df, val_df, tokenizer, llm, lr=2e-5)
 
-    BEST_LR = 1e-5 # <--- 根据前 3 个的结果修改这个值
+    BEST_LR = 2e-5 # <--- 根据前 3 个的结果修改这个值
     
     # 实验 2: Baseline 消融 (使用 BEST_LR)
-    # run_grpo_experiment("No_Baseline", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type="no_baseline")
-    # run_grpo_experiment("With_Baseline", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type="reinforce_with_baseline")
+    run_grpo_experiment("No_Baseline", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type="no_baseline")
+    run_grpo_experiment("With_Baseline", train_df, val_df, tokenizer, llm, lr=BEST_LR, loss_type="reinforce_with_baseline")
     
     BEST_LOSS = "reinforce_with_baseline" # <--- 根据实验 2 修改
     
